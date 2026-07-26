@@ -5,12 +5,25 @@ import Categories from "./Categories";
 import Filter from "./Filter";
 
 async function getProducts(): Promise<ProductType[]> {
-  const res = await fetch(`${process.env.BASE_URL}/api/product`, {
-    cache: "no-store",
-  });
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/product`,
+      {
+        cache: "no-store",
+      },
+    );
 
-  const data = await res.json();
-  return data.products;
+    if (!res.ok) {
+      console.error("Failed to fetch products:", res.status);
+      return [];
+    }
+
+    const data = await res.json();
+    return Array.isArray(data.products) ? data.products : [];
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return [];
+  }
 }
 
 const ProductList = async ({
@@ -26,9 +39,12 @@ const ProductList = async ({
 }) => {
   let products = await getProducts();
 
+  if (!Array.isArray(products)) {
+    products = [];
+  }
+
   const q = query?.toLowerCase() || "";
 
-  // 🔍 SEARCH FILTER
   if (q) {
     products = products.filter(
       (p) =>
@@ -37,9 +53,8 @@ const ProductList = async ({
     );
   }
 
-  // 1️⃣ DEFAULT HOMEPAGE: latest 10 products (only when no search)
   if (!category && !q) {
-    products = products
+    products = [...products]
       .sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -47,45 +62,45 @@ const ProductList = async ({
       .slice(0, 10);
   }
 
-  // 2️⃣ CATEGORY FILTER
   if (category && category !== "All") {
     products = products.filter((p) => p.category === category);
   }
 
-  // 2️⃣.5 SUBCATEGORY FILTER
   if (subcategory) {
     products = products.filter((p) => p.subcategory === subcategory);
   }
 
-  // 3️⃣ VIEW ALL PRODUCTS (FIXED: now respects subcategory)
   if (category === "All" && !q && !subcategory) {
-    products = products.sort(
+    products = [...products].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }
 
-  // 4️⃣ SORTING LOGIC
   if (sort === "newest") {
-    products = products.sort(
+    products = [...products].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }
 
   if (sort === "oldest") {
-    products = products.sort(
+    products = [...products].sort(
       (a, b) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
   }
 
   if (sort === "asc") {
-    products = products.sort((a, b) => a.sizes[0].price - b.sizes[0].price);
+    products = [...products].sort(
+      (a, b) => (a.sizes?.[0]?.price ?? 0) - (b.sizes?.[0]?.price ?? 0),
+    );
   }
 
   if (sort === "desc") {
-    products = products.sort((a, b) => b.sizes[0].price - a.sizes[0].price);
+    products = [...products].sort(
+      (a, b) => (b.sizes?.[0]?.price ?? 0) - (a.sizes?.[0]?.price ?? 0),
+    );
   }
 
   return (
@@ -93,7 +108,6 @@ const ProductList = async ({
       <Categories />
       <Filter />
 
-      {/*BREADCRUMB */}
       {(category || subcategory) && (
         <div className="text-sm text-gray-600 dark:text-gray-300 mb-4">
           {category && category !== "All" ? category : "All"}
@@ -106,12 +120,10 @@ const ProductList = async ({
         </div>
       )}
 
-      {/* PRODUCT COUNT */}
       <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
         {products.length} item{products.length !== 1 ? "s" : ""}
       </div>
 
-      {/* ⭐ AUTO-SCROLL TARGET */}
       <div
         id="product-list"
         className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-12"
