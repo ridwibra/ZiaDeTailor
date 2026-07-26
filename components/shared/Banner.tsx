@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,10 +16,26 @@ export default function HomeBanner() {
   useEffect(() => {
     const fetchBanners = async () => {
       try {
-        const res = await fetch("/api/banner");
+        const res = await fetch("/api/banner", {
+          headers: { Accept: "application/json" },
+        });
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(
+            errorText || `Failed to load banners (${res.status})`,
+          );
+        }
+
+        if (!contentType.includes("application/json")) {
+          const text = await res.text();
+          throw new Error(`Expected JSON, got: ${text.slice(0, 80)}`);
+        }
+
         const data = await res.json();
 
-        if (res.ok && data.banners) {
+        if (data.banners) {
           const sorted = data.banners
             .filter((b: any) => b.active !== false)
             .sort((a: any, b: any) => {
@@ -39,6 +56,7 @@ export default function HomeBanner() {
         }
       } catch (err) {
         console.error("Failed to load banners:", err);
+        setBanners([]);
       } finally {
         setLoading(false);
       }
@@ -76,16 +94,14 @@ export default function HomeBanner() {
         {banners.map((banner) => (
           <SwiperSlide key={banner._id}>
             <div className="relative w-full h-full">
-              {/* NEXT IMAGE */}
               <Image
                 src={banner.image.url}
                 alt={banner.title}
                 fill
                 className="object-cover"
-                priority={true}
+                priority
               />
 
-              {/* TEXT OVERLAY */}
               <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2">
                   {banner.title}
