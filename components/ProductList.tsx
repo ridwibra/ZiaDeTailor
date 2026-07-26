@@ -39,9 +39,7 @@ const ProductList = async ({
 }) => {
   let products = await getProducts();
 
-  if (!Array.isArray(products)) {
-    products = [];
-  }
+  if (!Array.isArray(products)) products = [];
 
   const q = query?.toLowerCase() || "";
 
