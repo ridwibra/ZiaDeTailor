@@ -30,6 +30,7 @@ const Navbar = () => {
   const [mounted, setMounted] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [search, setSearch] = useState("");
+  const [sessionFailed, setSessionFailed] = useState(false);
 
   const { state } = useStore();
   const cartItemsCount = state.cart.cartItems.reduce(
@@ -38,38 +39,57 @@ const Navbar = () => {
   );
   const router = useRouter();
 
-  const { data: session } = authClient.useSession();
+  const sessionResult = authClient.useSession();
+  const session = sessionFailed ? null : sessionResult.data;
   const user = session?.user as (UserType & { id: string }) | undefined;
   const role = user?.role;
   const canAccessAdmin = role === "admin" || role === "staff";
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (sessionResult.error) {
+      setSessionFailed(true);
+    }
+  }, [sessionResult.error]);
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
   const isDark = mounted && theme === "dark";
 
   const handleLogout = async () => {
-    await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          setShowDropdown(false);
-          router.push("/login");
+    try {
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            setShowDropdown(false);
+            router.push("/login");
+          },
         },
-      },
-    });
+      });
+    } catch (error) {
+      console.error("Logout failed:", error);
+      router.push("/login");
+    }
   };
 
-  /* LIVE SEARCH — update URL on every keystroke */
   useEffect(() => {
     const q = search.trim();
-    router.push(`/?query=${encodeURIComponent(q)}`, { scroll: false });
-  }, [search]);
+    const t = setTimeout(() => {
+      router.push(q ? `/?query=${encodeURIComponent(q)}` : "/", {
+        scroll: false,
+      });
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [search, router]);
 
   const avatarUrl = user?.avatar?.image_url || user?.image || null;
+  const firstName = user?.name?.trim()?.split(/\s+/)?.[0] || "User";
 
   return (
     <nav className="fixed top-0 left-0 w-full z-50 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2">
-      {/* LEFT: Logo */}
       <Link href="/" className="flex items-center gap-2">
         <Image
           src="/images/logo.jpeg"
@@ -80,7 +100,6 @@ const Navbar = () => {
           loading="eager"
           priority
         />
-
         <p
           className={`hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-100 ${pacifico.className}`}
         >
@@ -88,36 +107,18 @@ const Navbar = () => {
         </p>
       </Link>
 
-      {/* RIGHT SECTION */}
       <div className="flex items-center gap-6">
-        {/* SEARCH BAR */}
-        <div
-          className=" ml-2
-            flex items-center gap-2
-            rounded-md
-            ring-1 ring-gray-200 dark:ring-gray-700
-            px-2 py-1
-            shadow-sm
-            bg-white dark:bg-gray-800
-            transition-colors duration-300
-            w-28 sm:w-40 md:w-56
-            "
-        >
+        <div className="ml-2 flex items-center gap-2 rounded-md ring-1 ring-gray-200 dark:ring-gray-700 px-2 py-1 shadow-sm bg-white dark:bg-gray-800 transition-colors duration-300 w-28 sm:w-40 md:w-56">
           <Search className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-300" />
-
           <input
             id="search"
             placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="
-              text-xs sm:text-sm outline-0 bg-transparent
-              text-gray-700 dark:text-gray-200 w-full
-            "
+            className="text-xs sm:text-sm outline-0 bg-transparent text-gray-700 dark:text-gray-200 w-full"
           />
         </div>
 
-        {/* NAV ICONS */}
         <Link href="/">
           <Home className="w-5 h-5 text-gray-600 dark:text-gray-300 transition-colors" />
         </Link>
@@ -133,10 +134,10 @@ const Navbar = () => {
           )}
         </Link>
 
-        {/* THEME TOGGLE */}
         <button
           onClick={toggleTheme}
           className="relative w-6 h-6 flex items-center justify-center"
+          aria-label="Toggle theme"
         >
           <Moon
             className={`absolute w-4 h-4 text-gray-600 dark:text-gray-300 transition-all ${
@@ -154,11 +155,10 @@ const Navbar = () => {
           />
         </button>
 
-        {/* USER SECTION / DROPDOWN */}
         {session ? (
           <div className="relative">
             <button
-              onClick={() => setShowDropdown(!showDropdown)}
+              onClick={() => setShowDropdown((v) => !v)}
               className="flex items-center gap-2 group cursor-pointer"
             >
               {avatarUrl ? (
@@ -176,13 +176,11 @@ const Navbar = () => {
                 </div>
               )}
 
-              {/* FIRST NAME ONLY */}
               <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                {user?.name.trim().split(/\s+/)[0]}
+                {firstName}
               </span>
             </button>
 
-            {/* DROPDOWN MENU */}
             {showDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50">
                 {canAccessAdmin && (
@@ -195,6 +193,7 @@ const Navbar = () => {
                     Admin
                   </Link>
                 )}
+
                 <Link
                   href="/profile"
                   className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
