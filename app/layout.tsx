@@ -1,7 +1,6 @@
 import { SITE_NAME, SITE_URL } from "@/utils/constants";
 import "./globals.css";
 import { Toaster } from "sonner";
-import PageTracker from "@/components/auth/PageTracker";
 import ClientThemeProvider from "@/components/shared/ClientThemeProvider";
 
 // Global SEO defaults
@@ -51,7 +50,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning={true} className="">
-        <PageTracker />
         <Toaster
           position="top-right"
           theme="system"
