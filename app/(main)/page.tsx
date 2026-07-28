@@ -22,7 +22,7 @@ const HomePage = async ({
   return (
     <div className="space-y-12 px-2">
       <HomeBanner />
-      <Link href="/products/newproduct">testing</Link>
+      {/* <Link href="/products/newproduct">testing</Link> */}
       <ProductList
         category={category}
         sort={sort}

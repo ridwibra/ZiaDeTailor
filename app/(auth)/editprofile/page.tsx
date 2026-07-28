@@ -1,3 +1,4 @@
+// app/(auth)/editprofile/page.tsx
 "use client";
 
 import { useEffect, useState, ChangeEvent, FormEvent } from "react";

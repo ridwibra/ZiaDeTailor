@@ -1,3 +1,4 @@
+// app/(auth)/forgot/page.tsx
 "use client";
 
 import { useState } from "react";

@@ -1,3 +1,4 @@
+// app/(auth)/register/page.tsx
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";

@@ -12,6 +12,12 @@ const dbMongo = client.db();
 export const auth = betterAuth({
   appName: "CrowdLang",
   baseURL: process.env.BETTER_AUTH_URL,
+ trustedOrigins: [
+    "https://crowdlang.org",
+    "https://www.crowdlang.org",
+    "http://localhost:3000",
+  ],
+
   database: mongodbAdapter(dbMongo, { client }),
 
    

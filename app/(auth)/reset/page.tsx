@@ -1,3 +1,4 @@
+// app/(auth)/reset/page.tsx
 import ResetForm from "@/components/auth/ResetForm";
 import { Suspense } from "react";
 
