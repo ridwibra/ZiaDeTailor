@@ -26,7 +26,8 @@ export const auth = betterAuth({
         // 60 seconds * 60 minutes * 48 hours = 172,800 seconds
     expiresIn: 60 * 60 * 48, 
     sendVerificationEmail: async ({ user, url, token }, request) => {
-      const customVerifyUrl = `${process.env.BETTER_AUTH_URL}/verify/${token}`;
+        const base = process.env.BETTER_AUTH_URL?.trim();
+  const customVerifyUrl = `${base}/verify/${token}`;
       const emailPromise = sendEmail(
         user.email,
         customVerifyUrl,
