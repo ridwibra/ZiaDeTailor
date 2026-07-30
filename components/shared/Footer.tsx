@@ -83,26 +83,26 @@ const Footer = () => {
 
           <p
             className="
-            text-gray-700 dark:text-gray-300 
-            text-center md:text-left 
-            leading-tight
-          "
+    text-gray-700 dark:text-gray-300 
+    text-center md:text-left 
+    leading-tight
+  "
           >
-            15 Court Street
+            1556 Brookeville Avenue
             <br />
-            Columbus, Ohio 45701
+            Columbus, OH 43229
             <br />
-            United States
+            USA
           </p>
 
           <Link
-            href="https://maps.google.com/?q=15+Court+Street+Athens+Ohio+45701"
+            href="https://www.google.com/maps/place/40%C2%B006'21.9%22N+82%C2%B058'37.3%22W/@40.1060715,-82.9795875,17z/data=!3m1!4b1!4m4!3m3!8m2!3d40.1060715!4d-82.9770126?hl=en&entry=ttu&g_ep=EgoyMDI2MDcyNy4wIKXMDSoASAFQAw%3D%3D"
             target="_blank"
             className="
-              text-blue-600 dark:text-blue-400 
-              hover:underline 
-              transition-colors
-            "
+    text-blue-600 dark:text-blue-400 
+    hover:underline 
+    transition-colors
+  "
           >
             View on Google Maps
           </Link>
