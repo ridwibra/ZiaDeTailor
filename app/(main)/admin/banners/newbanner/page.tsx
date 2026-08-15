@@ -1,192 +1,451 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { ChangeEvent, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
 import dataURItoBlob from "@/utils/files/dataUrlToBlob";
-import { uploadMedia } from "@/utils/files/requests";
+import { deleteMedia, uploadMedia } from "@/utils/files/requests";
+
+type FieldErrors = {
+  title?: string;
+  subtitle?: string;
+  link?: string;
+  order?: string;
+  active?: string;
+  image?: string;
+  general?: string;
+};
+
+type ApiErrorResponse = {
+  field?: string;
+  message?: string;
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
+
+type BannerImagePreview = {
+  url: string;
+  size?: string;
+};
 
 export default function NewBannerPage() {
+  const router = useRouter();
+
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [link, setLink] = useState("");
   const [order, setOrder] = useState(0);
   const [active, setActive] = useState(true);
 
-  const [bannerImage, setBannerImage] = useState<{
-    url: string;
-    size?: string;
-  } | null>(null);
+  const [bannerImage, setBannerImage] = useState<BannerImagePreview | null>(
+    null,
+  );
 
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
-  // Format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} bytes`;
-    else if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    else return `${(bytes / 1048576).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Remove banner image
+  const clearFieldError = (field: keyof FieldErrors) => {
+    setErrors((previous) => {
+      if (!previous[field]) return previous;
+
+      const nextErrors = { ...previous };
+      delete nextErrors[field];
+
+      return nextErrors;
+    });
+  };
+
+  const inputClass = (field: keyof FieldErrors) =>
+    `w-full rounded-lg border p-3 outline-none transition ${
+      errors[field]
+        ? "border-red-500 ring-2 ring-red-500/20 focus:border-red-500 focus:ring-red-500/25"
+        : "border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+    }`;
+
+  const mapApiErrors = (fieldErrors: Record<string, string>): FieldErrors => {
+    const mapped: FieldErrors = {};
+
+    for (const [field, message] of Object.entries(fieldErrors)) {
+      if (
+        field === "title" ||
+        field === "subtitle" ||
+        field === "link" ||
+        field === "order" ||
+        field === "active" ||
+        field === "image" ||
+        field === "general"
+      ) {
+        mapped[field] = message;
+      }
+    }
+
+    return mapped;
+  };
+
+  const setApiError = (data: ApiErrorResponse) => {
+    if (data.fieldErrors && typeof data.fieldErrors === "object") {
+      setErrors(mapApiErrors(data.fieldErrors));
+      return;
+    }
+
+    if (
+      data.field === "title" ||
+      data.field === "subtitle" ||
+      data.field === "link" ||
+      data.field === "order" ||
+      data.field === "active" ||
+      data.field === "image"
+    ) {
+      setErrors({
+        [data.field]: data.message || data.error || "Invalid value.",
+      });
+
+      return;
+    }
+
+    setErrors({
+      general:
+        data.message || data.error || "Something went wrong. Please try again.",
+    });
+  };
+
+  const validateForm = () => {
+    const nextErrors: FieldErrors = {};
+
+    if (!title.trim()) {
+      nextErrors.title = "Banner title is required.";
+    } else if (title.trim().length > 120) {
+      nextErrors.title = "Banner title cannot exceed 120 characters.";
+    }
+
+    if (subtitle.trim().length > 240) {
+      nextErrors.subtitle = "Banner subtitle cannot exceed 240 characters.";
+    }
+
+    if (!Number.isInteger(order) || order < 0) {
+      nextErrors.order =
+        "Banner order must be a whole number that is zero or greater.";
+    }
+
+    if (!bannerImage?.url) {
+      nextErrors.image = "Please upload a banner image.";
+    }
+
+    setErrors(nextErrors);
+
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const handleRemoveBannerImage = () => {
-    if (bannerImage?.url) URL.revokeObjectURL(bannerImage.url);
     setBannerImage(null);
+    setErrors((previous) => ({
+      ...previous,
+      image: "Please upload a banner image.",
+    }));
   };
 
-  // Handle banner image upload
   const handleBannerImage = (event: ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || !event.target.files[0]) return;
+    const input = event.target;
+    const file = input.files?.[0];
 
-    const file = event.target.files[0];
+    if (!file) return;
+
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be under 5MB");
+      toast.error("Image must be under 5MB.");
+      input.value = "";
       return;
     }
 
     if (!allowedTypes.includes(file.type)) {
-      toast.error("Image must be JPG, PNG, or WEBP");
+      toast.error("Image must be JPG, PNG, or WEBP.");
+      input.value = "";
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setBannerImage({
-          url: e.target.result as string,
-          size: formatFileSize(file.size),
-        });
-      }
+
+    reader.onload = (readerEvent) => {
+      const result = readerEvent.target?.result;
+
+      if (typeof result !== "string") return;
+
+      setBannerImage({
+        url: result,
+        size: formatFileSize(file.size),
+      });
+
+      clearFieldError("image");
     };
 
     reader.readAsDataURL(file);
+    input.value = "";
   };
 
-  // Submit banner
   const createBanner = async () => {
-    if (!bannerImage?.url) {
-      toast.error("Please upload a banner image");
+    if (!validateForm() || !bannerImage?.url) {
+      toast.error("Please fix the highlighted fields.");
       return;
     }
 
     setLoading(true);
+    setErrors({});
+
+    let uploadedPublicId: string | null = null;
 
     try {
-      // Convert preview to Blob
       const blob = dataURItoBlob(bannerImage.url);
-      if (!blob) throw new Error("Failed to process image");
 
-      // Upload to Cloudinary
-      const file = new File([blob], "banner", { type: blob.type });
+      if (!blob) {
+        throw new Error("Failed to process the banner image.");
+      }
+
+      const file = new File([blob], "banner", {
+        type: blob.type || "image/jpeg",
+      });
+
       const uploadResponse = await uploadMedia(file, "banners");
+      const uploadedImage = uploadResponse?.[0];
 
-      const uploaded_image = {
-        url: uploadResponse[0].url,
-        public_id: uploadResponse[0].public_id,
-      };
+      if (!uploadedImage?.url || !uploadedImage?.public_id) {
+        throw new Error("Image upload failed. Please try again.");
+      }
 
-      // Send to API
-      const res = await fetch("/api/banner", {
+      uploadedPublicId = uploadedImage.public_id;
+
+      const response = await fetch("/api/banner", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          title,
-          subtitle,
-          link,
+          title: title.trim(),
+          subtitle: subtitle.trim(),
+          link: link.trim(),
           order,
           active,
-          image: uploaded_image,
+          image: {
+            url: uploadedImage.url,
+            public_id: uploadedImage.public_id,
+          },
         }),
       });
 
-      const data = await res.json();
+      const data = (await response.json()) as ApiErrorResponse;
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create banner");
+      if (!response.ok) {
+        setApiError(data);
+
+        throw new Error(
+          data.message || data.error || "Failed to create banner.",
+        );
       }
 
       toast.success("Banner created successfully!");
-      window.location.href = "/admin/banners";
-    } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+      router.push("/admin/banners");
+      router.refresh();
+    } catch (error: unknown) {
+      if (uploadedPublicId) {
+        try {
+          await deleteMedia(uploadedPublicId);
+        } catch (cleanupError) {
+          console.error(
+            "Failed to clean up newly uploaded banner image:",
+            cleanupError,
+          );
+        }
+      }
+
+      const message =
+        error instanceof Error ? error.message : "Something went wrong.";
+
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 pt-24">
-      <h1 className="text-3xl text-center font-bold mb-6">New Banner</h1>
+    <div className="mx-auto max-w-2xl p-6 pt-24">
+      <h1 className="mb-6 text-center text-3xl font-bold">New Banner</h1>
+
+      {errors.general && (
+        <div
+          role="alert"
+          className="mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+        >
+          {errors.general}
+        </div>
+      )}
 
       <div className="space-y-6">
-        {/* Title */}
         <div>
-          <label className="block text-sm font-medium mb-1">Title</label>
-          <input
-            className="w-full border rounded-lg p-3"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Summer Collection"
-          />
-        </div>
-
-        {/* Subtitle */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Subtitle</label>
-          <input
-            className="w-full border rounded-lg p-3"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Bold • Elegant • Authentic"
-          />
-        </div>
-
-        {/* Link */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Link (optional)
+          <label htmlFor="title" className="mb-1 block text-sm font-medium">
+            Title <span className="text-red-600">*</span>
           </label>
+
           <input
-            className="w-full border rounded-lg p-3"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            placeholder="/collections/summer"
+            id="title"
+            required
+            maxLength={120}
+            className={inputClass("title")}
+            value={title}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              clearFieldError("title");
+            }}
+            placeholder="Summer Collection"
+            aria-invalid={Boolean(errors.title)}
+            aria-describedby={errors.title ? "title-error" : undefined}
           />
+
+          {errors.title && (
+            <p id="title-error" className="mt-1 text-sm text-red-600">
+              {errors.title}
+            </p>
+          )}
         </div>
 
-        {/* Order */}
         <div>
-          <label className="block text-sm font-medium mb-1">Order</label>
+          <label htmlFor="subtitle" className="mb-1 block text-sm font-medium">
+            Subtitle <span className="text-gray-500">(optional)</span>
+          </label>
+
           <input
-            type="number"
-            className="w-full border rounded-lg p-3"
-            value={order}
-            onChange={(e) => setOrder(Number(e.target.value))}
-            placeholder="0"
+            id="subtitle"
+            maxLength={240}
+            className={inputClass("subtitle")}
+            value={subtitle}
+            onChange={(event) => {
+              setSubtitle(event.target.value);
+              clearFieldError("subtitle");
+            }}
+            placeholder="Bold • Elegant • Authentic"
+            aria-invalid={Boolean(errors.subtitle)}
+            aria-describedby={errors.subtitle ? "subtitle-error" : undefined}
           />
+
+          {errors.subtitle && (
+            <p id="subtitle-error" className="mt-1 text-sm text-red-600">
+              {errors.subtitle}
+            </p>
+          )}
         </div>
 
-        {/* Active Toggle */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium">Active</label>
+        <div>
+          <label htmlFor="link" className="mb-1 block text-sm font-medium">
+            Link <span className="text-gray-500">(optional)</span>
+          </label>
+
+          <input
+            id="link"
+            className={inputClass("link")}
+            value={link}
+            onChange={(event) => {
+              setLink(event.target.value);
+              clearFieldError("link");
+            }}
+            placeholder="/collections/summer"
+            aria-invalid={Boolean(errors.link)}
+            aria-describedby={errors.link ? "link-error" : undefined}
+          />
+
+          {errors.link && (
+            <p id="link-error" className="mt-1 text-sm text-red-600">
+              {errors.link}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="order" className="mb-1 block text-sm font-medium">
+            Order <span className="text-red-600">*</span>
+          </label>
+
+          <input
+            id="order"
+            type="number"
+            min={0}
+            step={1}
+            required
+            className={inputClass("order")}
+            value={order}
+            onChange={(event) => {
+              setOrder(Number(event.target.value));
+              clearFieldError("order");
+            }}
+            placeholder="0"
+            aria-invalid={Boolean(errors.order)}
+            aria-describedby={errors.order ? "order-error" : undefined}
+          />
+
+          {errors.order && (
+            <p id="order-error" className="mt-1 text-sm text-red-600">
+              {errors.order}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <span className="mb-1 block text-sm font-medium">
+            Active <span className="text-red-600">*</span>
+          </span>
+
           <button
             type="button"
-            onClick={() => setActive(!active)}
-            className={`px-4 py-2 rounded-lg text-white font-semibold transition
-              ${active ? "bg-green-600 hover:bg-green-700" : "bg-gray-500 hover:bg-gray-600"}
-            `}
+            onClick={() => {
+              setActive((previous) => !previous);
+              clearFieldError("active");
+            }}
+            className={`rounded-lg px-4 py-2 font-semibold text-white transition ${
+              active
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-gray-500 hover:bg-gray-600"
+            }`}
+            aria-pressed={active}
+            aria-describedby={errors.active ? "active-error" : undefined}
           >
             {active ? "Active" : "Inactive"}
           </button>
+
+          {errors.active && (
+            <p id="active-error" className="mt-1 text-sm text-red-600">
+              {errors.active}
+            </p>
+          )}
         </div>
 
-        {/* Image Upload */}
         <div>
-          <label className="block text-sm font-medium mb-1">Banner Image</label>
+          <label
+            htmlFor="banner-image"
+            className="mb-1 block text-sm font-medium"
+          >
+            Banner Image <span className="text-red-600">*</span>
+          </label>
 
-          <div className="flex items-start gap-4">
-            {/* Preview */}
+          {errors.image && (
+            <p id="image-error" className="mb-2 text-sm text-red-600">
+              {errors.image}
+            </p>
+          )}
+
+          <div
+            className={`flex items-start gap-4 rounded-lg border p-3 ${
+              errors.image ? "border-red-500 bg-red-50" : "border-transparent"
+            }`}
+          >
             <div className="relative">
               {bannerImage ? (
                 <>
@@ -195,33 +454,38 @@ export default function NewBannerPage() {
                     alt="Banner preview"
                     width={200}
                     height={120}
-                    className="rounded-lg w-48 h-28 object-cover border"
+                    className="h-28 w-48 rounded-lg border object-cover"
                   />
 
                   <button
                     type="button"
                     onClick={handleRemoveBannerImage}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                    aria-label="Remove selected banner image"
                   >
                     ✕
                   </button>
                 </>
               ) : (
-                <div className="w-48 h-28 rounded-lg border-2 border-dashed flex items-center justify-center text-gray-400">
+                <div className="flex h-28 w-48 items-center justify-center rounded-lg border-2 border-dashed text-gray-400">
                   No image
                 </div>
               )}
             </div>
 
-            {/* Upload Button */}
             <div className="flex-1">
-              <label className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg shadow-sm border bg-gray-600 hover:bg-gray-700 text-white cursor-pointer">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border bg-gray-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">
                 {bannerImage ? "Change Image" : "Upload Image"}
+
                 <input
+                  id="banner-image"
                   type="file"
+                  required={!bannerImage}
+                  accept="image/jpeg,image/png,image/webp"
                   className="hidden"
-                  accept="image/*"
                   onChange={handleBannerImage}
+                  aria-invalid={Boolean(errors.image)}
+                  aria-describedby={errors.image ? "image-error" : undefined}
                 />
               </label>
 
@@ -232,17 +496,17 @@ export default function NewBannerPage() {
               )}
 
               <p className="mt-1 text-xs text-gray-500">
-                JPG, PNG, WEBP — max 5MB
+                JPG, PNG, WEBP — maximum 5MB.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Submit */}
         <button
+          type="button"
           onClick={createBanner}
           disabled={loading}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-lg disabled:opacity-50"
+          className="w-full rounded-lg bg-blue-600 py-3 text-lg font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Creating..." : "Create Banner"}
         </button>

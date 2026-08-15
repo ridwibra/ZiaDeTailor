@@ -17,23 +17,62 @@ export interface IBanner extends Document {
 
 const BannerSchema = new Schema<IBanner>(
   {
-    title: { type: String },
-    subtitle: { type: String },
-    image: {
-      url: { type: String, required: true },
-      public_id: { type: String, required: true },
+    title: {
+      type: String,
+      required: [true, "Banner title is required."],
+      trim: true,
     },
-    link: { type: String },
-    order: { type: Number},
-    active: { type: Boolean, default: true },
+    subtitle: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    image: {
+      url: {
+        type: String,
+        required: [true, "Banner image URL is required."],
+        trim: true,
+      },
+
+      public_id: {
+        type: String,
+        required: [true, "Banner image public ID is required."],
+        trim: true,
+      },
+    },
+
+    link: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    order: {
+      type: Number,
+      default: 0,
+      min: [0, "Banner order cannot be negative."],
+      validate: {
+        validator: Number.isInteger,
+        message: "Banner order must be a whole number.",
+      },
+    },
+
+    active: {
+      type: Boolean,
+      default: true,
+    },
+
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export default mongoose.models.Banner ||
+const Banner =
+  mongoose.models.Banner ||
   mongoose.model<IBanner>("Banner", BannerSchema);
+
+export default Banner;

@@ -1,36 +1,62 @@
 import Image from "next/image";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
+
 import { ProductType } from "@/utils/types";
 import ProductInteraction from "@/components/ProductInteraction";
-import { Pencil, Trash2 } from "lucide-react";
-import { getSession } from "@/lib/server";
 import ProductImageGallery from "@/components/ImageGallery";
 import DeleteProductButton from "@/components/DeleteProductButton";
+import ProductReviews from "@/components/ProductReviews";
+import { getSession } from "@/lib/server";
 
 type Role = "admin" | "staff" | "user";
-/* Fetch ALL products */
-async function getAllProducts(): Promise<ProductType[]> {
+
+type ProductReview = {
+  _id: string;
+  user: string | { _id: string; name?: string };
+  name: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+type ProductDetail = ProductType & {
+  _id: string;
+  rating?: number;
+  numReviews?: number;
+  reviews?: ProductReview[];
+};
+
+async function getAllProducts(): Promise<ProductDetail[]> {
   const res = await fetch(`${process.env.BASE_URL}/api/product`, {
     cache: "no-store",
   });
 
-  if (!res.ok) return [];
+  if (!res.ok) {
+    return [];
+  }
+
   const data = await res.json();
-  return data.products;
+
+  return Array.isArray(data.products) ? (data.products as ProductDetail[]) : [];
 }
 
-/* Fetch product by ID */
-async function getProductById(id: string): Promise<ProductType | null> {
+async function getProductById(id: string): Promise<ProductDetail | null> {
   const res = await fetch(`${process.env.BASE_URL}/api/product/${id}`, {
     cache: "no-store",
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    return null;
+  }
+
   const data = await res.json();
-  return data.product;
+
+  return data.product ? (data.product as ProductDetail) : null;
 }
 
-/* Metadata */
 export async function generateMetadata({
   params,
 }: {
@@ -39,7 +65,7 @@ export async function generateMetadata({
   const { slug } = await params;
 
   const allProducts = await getAllProducts();
-  const product = allProducts.find((p) => p.slug === slug);
+  const product = allProducts.find((item) => item.slug === slug);
 
   if (!product) {
     return {
@@ -54,127 +80,197 @@ export async function generateMetadata({
   };
 }
 
-/* Product Page */
-const ProductDetailPage = async ({
+export default async function ProductDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
   searchParams?: Promise<{ color?: string; size?: string }>;
-}) => {
+}) {
   const { slug } = await params;
   const sp = searchParams ? await searchParams : {};
 
-  // ⭐ BetterAuth session
   const session = await getSession();
-  const isAdmin =
-    session?.user?.role === "admin" || session?.user?.role === "staff";
+  const role = session?.user?.role as Role | undefined;
+
+  const isAdmin = role === "admin" || role === "staff";
 
   const allProducts = await getAllProducts();
-  const productBySlug = allProducts.find((p) => p.slug === slug);
+
+  const productBySlug = allProducts.find((item) => item.slug === slug);
 
   if (!productBySlug) {
-    return <div className="mt-12 text-center">Product not found.</div>;
+    notFound();
   }
 
-  const productId = (productBySlug as any)._id;
-  const product = await getProductById(productId);
+  const product = await getProductById(productBySlug._id);
 
   if (!product) {
-    return <div className="mt-12 text-center">Product not found.</div>;
+    notFound();
   }
 
-  const selectedColor = sp.color || product.colors[0]?.hex || "#000000";
-  const selectedSize = sp.size || product.sizes[0]?.size || "M";
+  const selectedColor = sp.color || product.colors?.[0]?.hex || "#000000";
 
-  // ⭐ NEW: Active image state (first image by default)
-  const activeImage = product.images[0]?.url;
+  const selectedSize = sp.size || product.sizes?.[0]?.size || "";
+
+  const selectedPrice =
+    product.sizes.find((size) => size.size === selectedSize)?.price ??
+    product.sizes[0]?.price ??
+    0;
+
+  const rating = Number(product.rating ?? 0);
+  const numReviews = Number(product.numReviews ?? 0);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-12 mt-20 px-4 lg:px-12">
-      {/* IMAGE */}
-      <div className="w-full lg:w-5/12">
-        {/* MAIN IMAGE */}
-        <ProductImageGallery images={product.images} name={product.name} />
-      </div>
-
-      {/* DETAILS */}
-      <div className="w-full lg:w-7/12 flex flex-col gap-6">
-        {/* ⭐ ADMIN ACTIONS */}
-        <div className="flex items-center gap-3 mb-2">
+    <div className="min-h-screen bg-white pt-20 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="mx-auto max-w-screen-2xl px-4 py-8 sm:px-6 lg:px-12 lg:py-12">
+        <div className="mb-6 text-sm text-slate-500 dark:text-slate-400">
           <Link
-            href={`/products/${product.slug}/editproduct`}
-            className="px-3 py-1.5 rounded-md text-sm bg-blue-600 text-white hover:bg-blue-700 transition flex items-center gap-2"
+            href="/products"
+            className="transition hover:text-teal-600 dark:hover:text-teal-400"
           >
-            <Pencil className="w-4 h-4" />
-            Edit
+            Products
           </Link>
 
-          {/* <form
-            action={async () => {
-              "use server";
-              await fetch(
-                `${process.env.BASE_URL}/api/product/${(product as any)._id}`,
-                {
-                  method: "DELETE",
-                },
-              );
-            }}
-          >
-            <button
-              type="submit"
-              className="px-3 py-1.5 rounded-md text-sm bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-          </form> */}
-          {isAdmin && (
-            <DeleteProductButton
-              productId={(product as any)._id}
-              role={session?.user?.role as Role}
+          <span className="mx-2">/</span>
+
+          <span className="text-slate-800 dark:text-slate-200">
+            {product.name}
+          </span>
+        </div>
+
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
+          <div className="min-w-0">
+            <ProductImageGallery images={product.images} name={product.name} />
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-6">
+            {isAdmin && (
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={`/products/${product.slug}/editproduct`}
+                  className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Link>
+
+                <DeleteProductButton
+                  productId={product._id}
+                  role={role as Role}
+                />
+              </div>
+            )}
+
+            <div>
+              <p className="text-sm font-medium text-teal-600 dark:text-teal-400">
+                {product.category}
+                {product.subcategory ? ` · ${product.subcategory}` : ""}
+              </p>
+
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                {product.name}
+              </h1>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div
+                  className="flex items-center gap-0.5"
+                  aria-label={`${rating.toFixed(1)} out of 5 stars`}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      aria-hidden="true"
+                      className={
+                        star <= Math.round(rating)
+                          ? "text-amber-400"
+                          : "text-slate-300 dark:text-slate-700"
+                      }
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {rating > 0 ? rating.toFixed(1) : "No rating"}
+                </span>
+
+                <a
+                  href="#reviews"
+                  className="text-sm text-slate-500 underline underline-offset-4 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400"
+                >
+                  {numReviews} {numReviews === 1 ? "review" : "reviews"}
+                </a>
+              </div>
+            </div>
+
+            <p className="max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-base">
+              {product.description}
+            </p>
+
+            <div className="border-y border-slate-200 py-5 dark:border-slate-800">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Price
+              </p>
+
+              <h2 className="mt-1 text-3xl font-bold">
+                ${selectedPrice.toFixed(2)}
+              </h2>
+            </div>
+
+            <ProductInteraction
+              product={product}
+              selectedSize={selectedSize}
+              selectedColor={selectedColor}
             />
-          )}
+
+            {/* <div className="mt-2 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-6 dark:border-slate-800">
+              <Image src="/klarna.png" alt="Klarna" width={60} height={30} />
+
+              <Image
+                src="/cards.png"
+                alt="Accepted payment cards"
+                width={60}
+                height={30}
+              />
+
+              <Image src="/stripe.png" alt="Stripe" width={60} height={30} />
+            </div> */}
+
+            <p className="max-w-md text-xs leading-5 text-slate-500 dark:text-slate-400">
+              By clicking Pay Now, you agree to our{" "}
+              <Link
+                href="/terms"
+                className="underline hover:text-slate-900 dark:hover:text-white"
+              >
+                Terms & Conditions
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="underline hover:text-slate-900 dark:hover:text-white"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </div>
         </div>
 
-        <h1 className="text-3xl font-semibold tracking-tight">
-          {product.name}
-        </h1>
-
-        <p className="text-gray-600 leading-relaxed text-sm max-w-xl">
-          {product.description}
-        </p>
-
-        <h2 className="text-3xl font-bold">
-          $
-          {(
-            product.sizes.find((s) => s.size === selectedSize)?.price ||
-            product.sizes[0]?.price
-          ).toFixed(2)}
-        </h2>
-
-        <ProductInteraction
-          product={product}
-          selectedSize={selectedSize}
-          selectedColor={selectedColor}
-        />
-
-        {/* PAYMENT INFO */}
-        <div className="flex items-center gap-4 mt-6">
-          <Image src="/klarna.png" alt="klarna" width={60} height={30} />
-          <Image src="/cards.png" alt="cards" width={60} height={30} />
-          <Image src="/stripe.png" alt="stripe" width={60} height={30} />
-        </div>
-
-        <p className="text-gray-500 text-xs max-w-md">
-          By clicking Pay Now, you agree to our{" "}
-          <span className="underline hover:text-black">Terms & Conditions</span>{" "}
-          and <span className="underline hover:text-black">Privacy Policy</span>
-          .
-        </p>
+        <section
+          id="reviews"
+          className="mt-12 border-t border-slate-200 pt-10 dark:border-slate-800 lg:mt-16"
+        >
+          <ProductReviews
+            productId={product._id}
+            initialRating={rating}
+            initialNumReviews={numReviews}
+            initialReviews={product.reviews ?? []}
+            currentUserId={session?.user?.id ?? null}
+          />
+        </section>
       </div>
     </div>
   );
-};
-
-export default ProductDetailPage;
+}

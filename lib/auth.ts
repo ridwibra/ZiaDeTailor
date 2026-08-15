@@ -48,7 +48,7 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     // 60 seconds * 60 minutes * 3 hours = 10,800 seconds
-  expiresIn: 60 * 60 * 3, 
+  resetPasswordTokenExpiresIn: 60 * 60 * 3,
     sendResetPassword: async ({ user, url }, request) => {
       const emailPromise = sendEmail(
         user.email,

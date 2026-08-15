@@ -1,3 +1,4 @@
+//app/api/users/[id]/role/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
