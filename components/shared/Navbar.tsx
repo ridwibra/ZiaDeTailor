@@ -123,7 +123,7 @@ const Navbar = () => {
           <Home className="w-5 h-5 text-gray-600 dark:text-gray-300 transition-colors" />
         </Link>
 
-        <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300 transition-colors" />
+        {/* <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300 transition-colors" /> */}
 
         <Link href="/cart" className="relative">
           <ShoppingCart className="w-5 h-5 text-gray-600 dark:text-gray-300 transition-colors" />
