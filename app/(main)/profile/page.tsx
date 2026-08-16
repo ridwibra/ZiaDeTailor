@@ -1,64 +1,24 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
-import { LogoutButton } from "@/components/auth/LogoutButton";
-import { UserType } from "@/utils/types";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
 import { deleteMedia } from "@/utils/files/requests";
+import { UserType } from "@/utils/types";
+import { LogoutButton } from "@/components/auth/LogoutButton";
+import MyAddresses from "@/components/MyAddresses";
+import MyOrders from "@/components/MyOrders";
 
 type ProfileSection =
   | "overview"
   | "orders"
   | "addresses"
-  | "payments"
-  | "wishlist"
-  | "returns"
   | "security"
-  | "preferences"
-  | "support"
   | "account";
-
-function parseUserAgent(ua: string) {
-  if (!ua) return { browser: "Unknown", os: "Unknown device" };
-
-  const browserMatch =
-    ua.match(/Edg\/([\d.]+)/) ||
-    ua.match(/Chrome\/([\d.]+)/) ||
-    ua.match(/Firefox\/([\d.]+)/) ||
-    ua.match(/Safari\/([\d.]+)/);
-
-  const osMatch = ua.match(/\(([^)]+)\)/)?.[1] || "Unknown device";
-
-  return {
-    browser: browserMatch
-      ? browserMatch[0].replace("/", " ")
-      : "Unknown browser",
-    os: osMatch,
-  };
-}
-
-const formatDate = (date: Date | string) =>
-  new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(date));
-
-const sections: { id: ProfileSection; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "orders", label: "Orders" },
-  { id: "addresses", label: "Addresses" },
-  { id: "payments", label: "Payment Methods" },
-  { id: "wishlist", label: "Wishlist" },
-  { id: "returns", label: "Returns & Refunds" },
-  { id: "security", label: "Security" },
-  { id: "preferences", label: "Preferences" },
-  { id: "support", label: "Support" },
-  { id: "account", label: "Account Management" },
-];
 
 type CustomUser = {
   id: string;
@@ -70,50 +30,108 @@ type CustomUser = {
   } | null;
 };
 
+const sections: { id: ProfileSection; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "orders", label: "Orders" },
+  { id: "addresses", label: "Addresses" },
+  { id: "security", label: "Security" },
+  { id: "account", label: "Account Management" },
+];
+
+function parseUserAgent(userAgent: string) {
+  if (!userAgent) {
+    return {
+      browser: "Unknown browser",
+      os: "Unknown device",
+    };
+  }
+
+  const browserMatch =
+    userAgent.match(/Edg\/([\d.]+)/) ||
+    userAgent.match(/Chrome\/([\d.]+)/) ||
+    userAgent.match(/Firefox\/([\d.]+)/) ||
+    userAgent.match(/Safari\/([\d.]+)/);
+
+  const osMatch = userAgent.match(/\(([^)]+)\)/)?.[1] || "Unknown device";
+
+  return {
+    browser: browserMatch
+      ? browserMatch[0].replace("/", " ")
+      : "Unknown browser",
+    os: osMatch,
+  };
+}
+
+const formatDate = (date: Date | string | undefined | null) => {
+  if (!date) {
+    return "-";
+  }
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsedDate);
+};
+
 export default function AccountDashboardPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const { data: sessionData, isPending, error } = authClient.useSession();
+
+  const [deleting, setDeleting] = useState(false);
   const [activeSection, setActiveSection] =
     useState<ProfileSection>("overview");
 
+  const { data: sessionData, isPending, error } = authClient.useSession();
+
   const rawUserAgent = sessionData?.session?.userAgent ?? "";
+
   const { browser, os } = useMemo(
     () => parseUserAgent(rawUserAgent),
     [rawUserAgent],
   );
 
-  const handleDelete = async () => {
-    if (!confirm("Permanently delete your account? This cannot be undone."))
-      return;
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Permanently delete your account? This cannot be undone.",
+    );
 
-    setLoading(true);
+    if (!confirmed) {
+      return;
+    }
 
     try {
+      setDeleting(true);
+
       if (!sessionData) {
-        throw new Error("No active session");
+        throw new Error("No active session.");
       }
 
-      const user = sessionData.user as CustomUser;
+      const currentUser = sessionData.user as CustomUser;
+      const publicId = currentUser.avatar?.public_id;
 
-      // Avatar may be null
-      const publicId = user.avatar?.public_id;
-
-      // Delete Cloudinary avatar FIRST
       if (publicId) {
         await deleteMedia(publicId);
       }
 
-      // Delete BetterAuth user
-      const { error } = await authClient.deleteUser();
-      if (error) throw new Error(error.message || "Failed to delete account");
+      const { error: deleteError } = await authClient.deleteUser();
 
-      toast.success("Your account has been successfully deleted.");
+      if (deleteError) {
+        throw new Error(deleteError.message || "Failed to delete account.");
+      }
+
+      toast.success("Your account has been deleted.");
       router.push("/");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Deletion failed");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete account.",
+      );
     } finally {
-      setLoading(false);
+      setDeleting(false);
     }
   };
 
@@ -139,7 +157,7 @@ export default function AccountDashboardPage() {
   const statItems = [
     {
       label: "Role",
-      value: user.role,
+      value: user.role || "User",
     },
     {
       label: "Last Active",
@@ -164,12 +182,13 @@ export default function AccountDashboardPage() {
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-600 dark:text-teal-400">
               Account Center
             </p>
+
             <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
               My Account
             </h1>
+
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Manage your profile, preferences, and security settings in one
-              place.
+              Manage your account, orders, saved addresses, and security.
             </p>
           </div>
 
@@ -180,29 +199,22 @@ export default function AccountDashboardPage() {
             >
               Edit Profile
             </Link>
+
             <LogoutButton aria-label="Sign out of your account" />
           </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-white/50 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
-            <div className="mb-4 flex items-center justify-between lg:mb-5">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Navigation
-              </h2>
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="rounded-lg border border-red-500 px-3 py-2 text-xs font-semibold text-red-600 transition disabled:opacity-50 hover:bg-red-50 dark:hover:bg-red-950/30"
-              >
-                {loading ? "Deleting..." : "Delete Account"}
-              </button>
-            </div>
+            <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white lg:mb-5">
+              Navigation
+            </h2>
 
             <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               {sections.map((item) => (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => setActiveSection(item.id)}
                   className={`w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-teal-400 ${
                     activeSection === item.id
@@ -230,6 +242,7 @@ export default function AccountDashboardPage() {
                         }
                         alt={`${user.name}'s profile photo`}
                         fill
+                        sizes="128px"
                         className="object-cover"
                       />
                     </div>
@@ -240,6 +253,7 @@ export default function AccountDashboardPage() {
                       <h2 className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
                         {user.name}
                       </h2>
+
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                         {user.email}
                       </p>
@@ -257,6 +271,7 @@ export default function AccountDashboardPage() {
                           ? "Email verified"
                           : "Email not verified"}
                       </span>
+
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                         Member since {formatDate(user.createdAt)}
                       </span>
@@ -275,6 +290,7 @@ export default function AccountDashboardPage() {
                       <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                         {item.label}
                       </p>
+
                       <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {item.value}
                       </p>
@@ -289,10 +305,13 @@ export default function AccountDashboardPage() {
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   Orders
                 </h2>
+
                 <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Your recent orders will appear here. Implement fetching from
-                  <span className="font-medium"> /api/orders</span>.
+                  Track your order status, shipping updates, and confirm receipt
+                  after delivery.
                 </p>
+
+                <MyOrders />
               </section>
             )}
 
@@ -301,42 +320,8 @@ export default function AccountDashboardPage() {
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   Addresses
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Manage your shipping and billing addresses here.
-                </p>
-              </section>
-            )}
 
-            {activeSection === "payments" && (
-              <section className={contentCard}>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Payment Methods
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Saved cards and payment options will be shown here.
-                </p>
-              </section>
-            )}
-
-            {activeSection === "wishlist" && (
-              <section className={contentCard}>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Wishlist
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Products you’ve saved for later will appear here.
-                </p>
-              </section>
-            )}
-
-            {activeSection === "returns" && (
-              <section className={contentCard}>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Returns & Refunds
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Track your return requests and refund status here.
-                </p>
+                <MyAddresses />
               </section>
             )}
 
@@ -345,63 +330,52 @@ export default function AccountDashboardPage() {
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   Security
                 </h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Review information about your active session.
+                </p>
+
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                       Device
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
                       {os}
                     </p>
                   </div>
+
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                       Browser
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
                       {browser}
                     </p>
                   </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Session Started
+                    </p>
+
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+                      {formatDate(sessionDetails.createdAt)}
+                    </p>
+                  </div>
+
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                       Session Expires
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
                       {formatDate(sessionDetails.expiresAt)}
                     </p>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      IP Address
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
-                      Hidden for security
-                    </p>
-                  </div>
                 </div>
-              </section>
-            )}
-
-            {activeSection === "preferences" && (
-              <section className={contentCard}>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Preferences
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Notification, language, and theme preferences will be managed
-                  here.
-                </p>
-              </section>
-            )}
-
-            {activeSection === "support" && (
-              <section className={contentCard}>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Support
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Contact support, view FAQs, and read policies here.
-                </p>
               </section>
             )}
 
@@ -410,16 +384,29 @@ export default function AccountDashboardPage() {
                 <h2 className="text-xl font-bold text-red-600 dark:text-red-400">
                   Account Management
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Export your data or delete your account. These actions are
-                  irreversible.
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Deleting your account permanently removes your profile and
+                  ends active access. This action cannot be undone.
                 </p>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                    Export Data
-                  </button>
-                  <button className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
-                    Delete Account
+
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+                  <p className="font-semibold text-red-700 dark:text-red-300">
+                    Delete account
+                  </p>
+
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-300">
+                    Before deleting your account, make sure you no longer need
+                    access to your account information or order history.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deleting ? "Deleting Account..." : "Delete Account"}
                   </button>
                 </div>
               </section>

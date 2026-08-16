@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
@@ -92,11 +91,9 @@ export default async function ProductDetailPage({
 
   const session = await getSession();
   const role = session?.user?.role as Role | undefined;
-
   const isAdmin = role === "admin" || role === "staff";
 
   const allProducts = await getAllProducts();
-
   const productBySlug = allProducts.find((item) => item.slug === slug);
 
   if (!productBySlug) {
@@ -109,14 +106,20 @@ export default async function ProductDetailPage({
     notFound();
   }
 
-  const selectedColor = sp.color || product.colors?.[0]?.hex || "#000000";
+  const selectedColor = sp.color || "";
 
-  const selectedSize = sp.size || product.sizes?.[0]?.size || "";
+  const requestedSize = sp.size?.trim() || "";
 
-  const selectedPrice =
-    product.sizes.find((size) => size.size === selectedSize)?.price ??
-    product.sizes[0]?.price ??
-    0;
+  const selectedSize =
+    product.sizes?.find((item) => item.size === requestedSize)?.size ||
+    product.sizes?.[0]?.size ||
+    "";
+
+  const selectedSizeData =
+    product.sizes?.find((item) => item.size === selectedSize) ??
+    product.sizes?.[0];
+
+  const selectedPrice = Number(selectedSizeData?.price ?? 0);
 
   const rating = Number(product.rating ?? 0);
   const numReviews = Number(product.numReviews ?? 0);
@@ -145,7 +148,7 @@ export default async function ProductDetailPage({
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
-            {isAdmin && (
+            {isAdmin ? (
               <div className="flex flex-wrap items-center gap-3">
                 <Link
                   href={`/products/${product.slug}/editproduct`}
@@ -160,7 +163,7 @@ export default async function ProductDetailPage({
                   role={role as Role}
                 />
               </div>
-            )}
+            ) : null}
 
             <div>
               <p className="text-sm font-medium text-teal-600 dark:text-teal-400">
@@ -198,7 +201,7 @@ export default async function ProductDetailPage({
 
                 <a
                   href="#reviews"
-                  className="text-sm text-slate-500 underline underline-offset-4 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400"
+                  className="text-sm text-slate-500 underline underline-offset-4 transition hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400"
                 >
                   {numReviews} {numReviews === 1 ? "review" : "reviews"}
                 </a>
@@ -211,12 +214,24 @@ export default async function ProductDetailPage({
 
             <div className="border-y border-slate-200 py-5 dark:border-slate-800">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Price
+                {selectedSize ? `Price for size ${selectedSize}` : "Price"}
               </p>
 
               <h2 className="mt-1 text-3xl font-bold">
                 ${selectedPrice.toFixed(2)}
               </h2>
+
+              {selectedSize ? (
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  Select this size below. You can optionally add custom
+                  measurements for tailoring while keeping the selected size as
+                  the base size.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  This product does not have sizes configured yet.
+                </p>
+              )}
             </div>
 
             <ProductInteraction
@@ -225,31 +240,18 @@ export default async function ProductDetailPage({
               selectedColor={selectedColor}
             />
 
-            {/* <div className="mt-2 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-6 dark:border-slate-800">
-              <Image src="/klarna.png" alt="Klarna" width={60} height={30} />
-
-              <Image
-                src="/cards.png"
-                alt="Accepted payment cards"
-                width={60}
-                height={30}
-              />
-
-              <Image src="/stripe.png" alt="Stripe" width={60} height={30} />
-            </div> */}
-
             <p className="max-w-md text-xs leading-5 text-slate-500 dark:text-slate-400">
               By clicking Pay Now, you agree to our{" "}
               <Link
                 href="/terms"
-                className="underline hover:text-slate-900 dark:hover:text-white"
+                className="underline transition hover:text-slate-900 dark:hover:text-white"
               >
                 Terms & Conditions
               </Link>{" "}
               and{" "}
               <Link
                 href="/privacy"
-                className="underline hover:text-slate-900 dark:hover:text-white"
+                className="underline transition hover:text-slate-900 dark:hover:text-white"
               >
                 Privacy Policy
               </Link>

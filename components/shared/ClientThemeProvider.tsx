@@ -1,4 +1,3 @@
-//components/shared/ClientThemeProvider.tsx
 "use client";
 
 import { ThemeProvider } from "next-themes";
@@ -11,8 +10,8 @@ export default function ClientThemeProvider({
   return (
     <ThemeProvider
       attribute="class"
-      enableSystem
       defaultTheme="system"
+      enableSystem
       disableTransitionOnChange
     >
       {children}

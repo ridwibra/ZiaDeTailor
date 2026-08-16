@@ -83,6 +83,7 @@ const navigationLinks = [
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/banners", label: "Banners" },
+  { href: "/admin/shipping", label: "Shipping" },
   { href: "/admin/users", label: "Users" },
 ];
 
