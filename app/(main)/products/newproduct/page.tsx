@@ -186,7 +186,7 @@ export default function CreatePostPage() {
         return;
       }
 
-      if (file.size > 5 * 1024 * 1024) {
+      if (file.size > 20 * 1024 * 1024) {
         toast.error(`"${file.name}" is larger than 5MB.`);
         e.target.value = "";
         return;
@@ -195,7 +195,7 @@ export default function CreatePostPage() {
 
     const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 
-    if (totalSize > 25 * 1024 * 1024) {
+    if (totalSize > 100 * 1024 * 1024) {
       toast.error("Total image size must not exceed 25MB.");
       e.target.value = "";
       return;
