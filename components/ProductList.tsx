@@ -130,7 +130,7 @@ export default async function ProductList({
       {products.length > 0 ? (
         <div
           id="product-list"
-          className="grid grid-cols-1 gap-12 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+          className="grid grid-cols-2 gap-4 sm:gap-12 xl:grid-cols-3 2xl:grid-cols-4"
         >
           {products.map((product) => (
             <ProductCard

@@ -3,50 +3,66 @@
 import { useState } from "react";
 import Image from "next/image";
 
+type GalleryImage = {
+  url: string;
+  public_id: string;
+};
+
 export default function ProductImageGallery({
   images,
   name,
 }: {
-  images: { url: string; public_id: string }[];
+  images: GalleryImage[];
   name: string;
 }) {
   const [activeImage, setActiveImage] = useState(images[0]?.url || "");
 
   return (
     <div className="w-full">
-      <div className="relative h-[80vw] max-h-[520px] lg:aspect-square lg:h-auto bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-slate-900">
         {activeImage ? (
           <Image
             src={activeImage}
             alt={name}
-            fill
+            width={1600}
+            height={2000}
             priority
-            className="object-cover transition-all duration-300"
+            sizes="(max-width: 1024px) 100vw, 42vw"
+            className="h-auto w-full"
           />
-        ) : null}
+        ) : (
+          <div className="flex aspect-[4/5] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+            No image available
+          </div>
+        )}
       </div>
 
-      <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
-        {images.map((img) => (
-          <button
-            key={img.public_id}
-            type="button"
-            onClick={() => setActiveImage(img.url)}
-            className={`relative w-20 h-20 rounded-lg overflow-hidden border transition shrink-0 ${
-              activeImage === img.url
-                ? "border-black ring-2 ring-black"
-                : "border-gray-300 hover:border-black"
-            }`}
-          >
-            <Image
-              src={img.url}
-              alt={`${name} thumbnail`}
-              fill
-              className="object-cover"
-            />
-          </button>
-        ))}
-      </div>
+      {images.length > 1 ? (
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+          {images.map((image, index) => (
+            <button
+              key={image.public_id || `${image.url}-${index}`}
+              type="button"
+              onClick={() => setActiveImage(image.url)}
+              className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border transition ${
+                activeImage === image.url
+                  ? "border-black ring-2 ring-black dark:border-white dark:ring-white"
+                  : "border-gray-300 hover:border-black dark:border-gray-700 dark:hover:border-white"
+              }`}
+              aria-label={`View ${name} image ${index + 1}`}
+              aria-pressed={activeImage === image.url}
+            >
+              <Image
+                src={image.url}
+                alt=""
+                fill
+                sizes="80px"
+                className="object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

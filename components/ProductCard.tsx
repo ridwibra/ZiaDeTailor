@@ -90,14 +90,14 @@ export default function ProductCard({ product }: { product: ProductType }) {
   return (
     <article className="overflow-hidden rounded-lg bg-white shadow-lg dark:bg-gray-800">
       <Link href={`/products/${product.slug}`}>
-        <div className="relative aspect-square bg-gray-100 dark:bg-gray-700">
+        <div className="relative aspect-[4/5] bg-gray-100 dark:bg-gray-700">
           {primaryImage?.url ? (
             <Image
               src={primaryImage.url}
               alt={product.name}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw"
-              className="object-cover transition-transform duration-300 hover:scale-105"
+              className="object-contain transition-transform duration-300 hover:scale-[1.02]"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-300">
