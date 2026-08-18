@@ -24,130 +24,100 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const isValidEmail = (value: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const isValidEmail = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const togglePasswordVisibility = () => {
-    setShowPassword((previous) => !previous);
-  };
+  const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
 
-  const handleGoogleSignIn = async () => {
-    setEmailError("");
-    setPasswordError("");
-    setLoginError("");
-    setLoading(true);
-
-    try {
-      const result = await authClient.signIn.social({
-        provider: "google",
-        callbackURL: "/",
-      });
-
-      if (result?.error) {
-        throw new Error(
-          result.error.message || "Unable to start Google sign-in.",
-        );
-      }
-
-      /*
-        Better Auth redirects the browser to Google.
-        Do not set loading to false here: the user should leave this page.
-      */
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to start Google sign-in.";
-
-      console.error("Google sign-in error:", error);
-
-      setLoginError(message);
-      toast.error(message);
-      setLoading(false);
-    }
-  };
-
-  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     setEmailError("");
     setPasswordError("");
     setLoginError("");
 
-    if (!email.trim()) {
-      setEmailError("Email is required.");
-      return;
-    }
-
-    if (!isValidEmail(email.trim())) {
-      setEmailError("Invalid email address.");
-      return;
-    }
-
-    if (!password) {
-      setPasswordError("Password is required.");
-      return;
-    }
+    if (!email) return setEmailError("Email is required");
+    if (!isValidEmail(email)) return setEmailError("Invalid email address");
+    if (!password) return setPasswordError("Password is required");
 
     setLoading(true);
 
     try {
       const result = await authClient.signIn.email({
-        email: email.trim(),
+        email,
         password,
       });
 
       if (result.error) {
         setLoginError(result.error.message || "Login failed.");
-        return;
+      } else {
+        toast.success("Login successful!");
+        router.push("/");
       }
-
-      toast.success("Login successful!");
-      router.push("/");
-      router.refresh();
     } catch (error) {
-      const message =
+      setLoginError(
         error instanceof Error
           ? error.message
-          : "An unexpected error occurred.";
-
-      console.error("Email sign-in error:", error);
-      setLoginError(message);
-      toast.error(message);
+          : "An unexpected error occurred.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="relative flex min-h-screen w-full flex-col items-center justify-center bg-[#f7f9fc] px-4 py-10 dark:bg-[#0f172a]">
-      {loading ? <DotLoaderSpinner loading={loading} /> : null}
+    <div
+      className="
+        min-h-screen w-full 
+        flex flex-col items-center 
+        justify-center 
+        px-4 py-10 
+        bg-[#f7f9fc] 
+        dark:bg-[#0f172a]
+        relative
+      "
+    >
+      {loading && <DotLoaderSpinner loading={loading} />}
+      {/* Glow + Noise */}
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,rgba(0,200,255,0.12),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-[0.04] mix-blend-overlay pointer-events-none" />
 
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,rgba(0,200,255,0.12),transparent_70%)]" />
-
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-[0.04] mix-blend-overlay" />
-
-      <div className="z-10 mb-6 flex flex-col items-center">
+      {/* Logo */}
+      <div className="mb-6 flex flex-col items-center z-10">
         <Image
           src="/images/logo.jpeg"
-          alt="Zia Detailor logo"
+          alt="CrowdLang Logo"
           width={120}
           height={120}
-          priority
           className="opacity-95 drop-shadow-xl"
         />
       </div>
 
-      <section className="z-10 w-full max-w-md rounded-3xl border border-[#e5e7eb] bg-white p-8 shadow-xl dark:border-[#334155] dark:bg-[#1e293b]/80">
-        <h1 className="mb-6 text-center text-3xl font-bold text-[#1f2937] dark:text-white">
+      {/* Card */}
+      <div
+        className="
+          w-full max-w-md 
+          bg-white 
+          dark:bg-[#1e293b]/80 
+          border border-[#e5e7eb] dark:border-[#334155] 
+          shadow-xl 
+          rounded-3xl 
+          p-8 
+          z-10
+        "
+      >
+        {loading && <DotLoaderSpinner loading={loading} />}
+
+        <h1 className="text-3xl font-bold text-center text-[#1f2937] dark:text-white mb-6">
           Welcome Back
         </h1>
 
-        <form onSubmit={onSubmit} className="space-y-5" noValidate>
+        <form onSubmit={onSubmit} className="space-y-5">
+          {/* Email */}
           <div>
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-semibold text-[#1f2937] dark:text-[#e2e8f0]"
+              className="block text-sm font-semibold text-[#1f2937] dark:text-[#e2e8f0] mb-1"
             >
               Email Address*
             </label>
@@ -155,38 +125,37 @@ export default function LoginForm() {
             <input
               id="email"
               type="email"
-              autoComplete="email"
               value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                setEmailError("");
-                setLoginError("");
-              }}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              disabled={loading}
-              className={`w-full rounded-xl border bg-[#f3f4f6] px-4 py-3 text-[#1f2937] outline-none transition-all placeholder:text-[#94a3b8] focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#1e293b] dark:text-white ${
-                emailError
-                  ? "border-red-500 focus:ring-red-500"
-                  : "border-[#e5e7eb] dark:border-[#334155]"
-              }`}
-              aria-invalid={Boolean(emailError)}
-              aria-describedby={emailError ? "email-error" : undefined}
+              className={`
+                w-full px-4 py-3 rounded-xl 
+                bg-[#f3f4f6] dark:bg-[#1e293b] 
+                text-[#1f2937] dark:text-white 
+                border 
+                ${
+                  emailError
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-[#e5e7eb] dark:border-[#334155]"
+                }
+                placeholder-[#94a3b8]
+                focus:ring-2 focus:ring-teal-500 
+                outline-none transition-all
+              `}
             />
 
-            {emailError ? (
-              <p
-                id="email-error"
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
-              >
+            {emailError && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                 {emailError}
               </p>
-            ) : null}
+            )}
           </div>
 
+          {/* Password */}
           <div>
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-semibold text-[#1f2937] dark:text-[#e2e8f0]"
+              className="block text-sm font-semibold text-[#1f2937] dark:text-[#e2e8f0] mb-1"
             >
               Password*
             </label>
@@ -195,101 +164,122 @@ export default function LoginForm() {
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
                 value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  setPasswordError("");
-                  setLoginError("");
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                disabled={loading}
-                className={`w-full rounded-xl border bg-[#f3f4f6] px-4 py-3 pr-10 text-[#1f2937] outline-none transition-all placeholder:text-[#94a3b8] focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#1e293b] dark:text-white ${
-                  passwordError
-                    ? "border-red-500 focus:ring-red-500"
-                    : "border-[#e5e7eb] dark:border-[#334155]"
-                }`}
-                aria-invalid={Boolean(passwordError)}
-                aria-describedby={passwordError ? "password-error" : undefined}
+                className={`
+                  w-full px-4 py-3 rounded-xl 
+                  bg-[#f3f4f6] dark:bg-[#1e293b] 
+                  text-[#1f2937] dark:text-white 
+                  border 
+                  ${
+                    passwordError
+                      ? "border-red-500 focus:ring-red-500"
+                      : "border-[#e5e7eb] dark:border-[#334155]"
+                  }
+                  placeholder-[#94a3b8]
+                  focus:ring-2 focus:ring-teal-500 
+                  outline-none transition-all
+                  pr-10
+                `}
               />
 
               <button
                 type="button"
                 onClick={togglePasswordVisibility}
-                disabled={loading}
                 aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] transition hover:text-[#1f2937] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#94a3b8] dark:hover:text-white"
+                className="
+                  absolute right-3 top-1/2 -translate-y-1/2 
+                  text-[#64748b] dark:text-[#94a3b8] 
+                  hover:text-[#1f2937] dark:hover:text-white
+                  transition
+                "
               >
                 {showPassword ? (
-                  <EyeOff className="h-5 w-5" />
+                  <EyeOff className="w-5 h-5" />
                 ) : (
-                  <Eye className="h-5 w-5" />
+                  <Eye className="w-5 h-5" />
                 )}
               </button>
             </div>
 
-            {passwordError ? (
-              <p
-                id="password-error"
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
-              >
+            {passwordError && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                 {passwordError}
               </p>
-            ) : null}
+            )}
           </div>
 
+          {/* Forgot Password */}
           <div className="flex justify-end">
             <Link
               href="/forgot"
-              className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300"
+              className="text-sm font-medium text-teal-600 dark:text-teal-300 hover:underline"
             >
               Forgot password?
             </Link>
           </div>
 
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-teal-400 to-cyan-500 py-3 text-base font-semibold text-black transition-all duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="
+              w-full py-3 rounded-xl 
+              text-black text-base font-semibold 
+              flex items-center justify-center 
+              transition-all duration-200
+              bg-gradient-to-r from-teal-400 to-cyan-500
+              hover:opacity-90
+              disabled:opacity-50 disabled:cursor-not-allowed
+            "
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
 
-          {loginError ? (
-            <div
-              role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
-            >
+          {/* Error */}
+          {loginError && (
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-sm">
               {loginError}
             </div>
-          ) : null}
+          )}
 
+          {/* Social Login — ONLY GOOGLE */}
           <div className="mt-8">
-            <p className="mb-4 text-center tracking-wide text-[#475569] dark:text-[#cbd5e1]">
+            <p className="text-center text-[#475569] dark:text-[#cbd5e1] mb-4 tracking-wide">
               or continue with
             </p>
 
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="w-full rounded-xl border border-[#e5e7eb] bg-[#f3f4f6] py-2.5 text-sm text-[#1f2937] transition hover:bg-[#e2e8f0] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#334155] dark:bg-[#1e293b] dark:text-white dark:hover:bg-[#334155]"
-            >
-              {loading ? "Redirecting to Google..." : "Continue with Google"}
-            </button>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => authClient.signIn.social({ provider: "google" })}
+                className="
+                  py-2.5 rounded-xl 
+                  bg-[#f3f4f6] dark:bg-[#1e293b] 
+                  border border-[#e5e7eb] dark:border-[#334155] 
+                  text-[#1f2937] dark:text-white 
+                  hover:bg-[#e2e8f0] dark:hover:bg-[#334155] 
+                  transition text-sm
+                "
+              >
+                Google
+              </button>
+            </div>
           </div>
 
-          <div className="mt-6 text-center text-sm text-[#64748b] dark:text-[#cbd5e1]">
+          {/* Register */}
+          <div className="text-center text-sm text-[#64748b] dark:text-[#cbd5e1] mt-6">
             Don&apos;t have an account?{" "}
             <Link
               href="/register"
-              className="font-medium text-teal-600 hover:underline dark:text-teal-300"
+              className="text-teal-600 dark:text-teal-300 hover:underline font-medium"
             >
               Register
             </Link>
           </div>
         </form>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
